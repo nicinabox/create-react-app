@@ -9,6 +9,8 @@
   const darkGray = '#878e91'
   const lightGray = '#fafafa'
   const red = '#ce1126'
+  const lightRed = '#fccfcf'
+  const yellow = '#fbf5b4'
 
   const overlayStyle = {
     position: 'fixed',
@@ -75,6 +77,13 @@
     'font-size': '1.2em',
   }
 
+  const primaryErrorStyle = {
+    'background-color': lightRed
+  }
+
+  const secondaryErrorStyle = {
+    'background-color': yellow
+  }
   const omittedFramesStyle = {
     color: black,
     'margin': '1.5em 0'
@@ -135,7 +144,7 @@
     }
   }
 
-  function sourceCodePre(sourceLines, lineNum, columnNum) {
+  function sourceCodePre(sourceLines, lineNum, columnNum, main = false) {
     let sourceCode = []
     sourceLines.forEach(({ text, line }) => {
       sourceCode[line - 1] = text
@@ -149,6 +158,15 @@
     const htmlHighlight = ansiHTML(ansiHighlight)
     const code = document.createElement('code')
     code.innerHTML = htmlHighlight
+    for (let node of code.childNodes) {
+      let breakOut = false
+      for (let lineNode of node.childNodes) {
+        if (lineNode.innerText.indexOf(` ${lineNum} |`) === -1) continue
+        applyStyles(node, main ? primaryErrorStyle : secondaryErrorStyle)
+        breakOut = true
+      }
+      if (breakOut) break
+    }
     const pre = document.createElement('pre')
     applyStyles(pre, preStyle)
     pre.appendChild(code)
@@ -197,6 +215,7 @@
       trace.appendChild(omittedFrames)
       omittedFramesCount = 0
     }
+    let main = true
     for (let frame of resolvedFrames) {
       const {
         functionName,
@@ -244,7 +263,8 @@
       elem.appendChild(elemLink)
 
       if (!internalUrl && sourceLines.length !== 0) {
-        elem.appendChild(sourceCodePre(sourceLines, sourceLineNumber, sourceColumnNumber))
+        elem.appendChild(sourceCodePre(sourceLines, sourceLineNumber, sourceColumnNumber, main))
+        main = false
       }
 
       trace.appendChild(elem)
