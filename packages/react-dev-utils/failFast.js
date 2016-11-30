@@ -122,9 +122,18 @@
   let errorCache = null
   let additionalCount = 0
   let internalDisabled = true
+  let sourceDisabled = false
 
   function toggleInternal() {
     internalDisabled = !internalDisabled
+    if (errorCache != null) {
+      unmount()
+      crash(errorCache)
+    }
+  }
+
+  function toggleSource() {
+    sourceDisabled = !sourceDisabled
     if (errorCache != null) {
       unmount()
       crash(errorCache)
@@ -185,6 +194,8 @@
     const hints = document.createElement('div')
     hints.appendChild(document.createTextNode(`[i] ${internalDisabled ? 'Show' : 'Hide'} internal calls`))
     hints.appendChild(document.createTextNode('\t\t'))
+    hints.appendChild(document.createTextNode(`[s] ${sourceDisabled ? 'Hide' : 'Show'} script source`))
+    hints.appendChild(document.createTextNode('\t\t'))
     hints.appendChild(document.createTextNode('[escape] Close'))
     applyStyles(hints, hintsStyle)
     overlay.appendChild(hints)
@@ -220,7 +231,7 @@
       const {
         functionName,
         fileName, lineNumber, columnNumber,
-        _scriptLines,
+        scriptLines,
         sourceFileName, sourceLineNumber, sourceColumnNumber,
         sourceLines
       } = frame
@@ -262,8 +273,12 @@
       elemLink.appendChild(elemAnchor)
       elem.appendChild(elemLink)
 
-      if (!internalUrl && sourceLines.length !== 0) {
-        elem.appendChild(sourceCodePre(sourceLines, sourceLineNumber, sourceColumnNumber, main))
+      if (!internalUrl) {
+        if (sourceDisabled && scriptLines.length !== 0) {
+          elem.appendChild(sourceCodePre(scriptLines, lineNumber, columnNumber, main))
+        } else if (!sourceDisabled && sourceLines.length !== 0) {
+          elem.appendChild(sourceCodePre(sourceLines, sourceLineNumber, sourceColumnNumber, main))
+        }
         main = false
       }
 
@@ -330,6 +345,7 @@
     const { key, keyCode, which } = event
     if (key === 'Escape' || keyCode === 27 || which === 27) unmount()
     else if (key === 'i' || keyCode === 73 || which === 73) toggleInternal()
+    else if (key === 's' || keyCode === 83 || which === 83) toggleSource()
   }
 
   window.addEventListener('keydown', escapeHandler)
