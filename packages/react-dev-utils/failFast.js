@@ -9,6 +9,8 @@
   const darkGray = '#878e91'
   const lightGray = '#fafafa'
   const red = '#ce1126'
+  const lightRed = '#fccfcf'
+  const yellow = '#fbf5b4'
 
   const overlayStyle = {
     position: 'fixed',
@@ -72,6 +74,13 @@
     'font-size': '1.2em',
   }
 
+  const primaryErrorStyle = {
+    'background-color': lightRed
+  }
+
+  const secondaryErrorStyle = {
+    'background-color': yellow
+  }
   const omittedFramesStyle = {
     color: black,
     'font-size': '0.9em',
@@ -115,9 +124,18 @@
   let errorCache = null
   let additionalCount = 0
   let internalDisabled = true
+  let sourceDisabled = false
 
   function toggleInternal() {
     internalDisabled = !internalDisabled
+    if (errorCache != null) {
+      unmount()
+      crash(errorCache)
+    }
+  }
+
+  function toggleSource() {
+    sourceDisabled = !sourceDisabled
     if (errorCache != null) {
       unmount()
       crash(errorCache)
@@ -137,7 +155,7 @@
     }
   }
 
-  function sourceCodePre(sourceLines, lineNum, columnNum) {
+  function sourceCodePre(sourceLines, lineNum, columnNum, main = false) {
     let sourceCode = []
     sourceLines.forEach(({ text, line }) => {
       sourceCode[line - 1] = text
@@ -152,6 +170,16 @@
     const code = document.createElement('code')
     code.innerHTML = htmlHighlight
     applyStyles(code, codeStyle)
+
+    for (let node of code.childNodes) {
+      let breakOut = false
+      for (let lineNode of node.childNodes) {
+        if (lineNode.innerText.indexOf(` ${lineNum} |`) === -1) continue
+        applyStyles(node, main ? primaryErrorStyle : secondaryErrorStyle)
+        breakOut = true
+      }
+      if (breakOut) break
+    }
 
     const pre = document.createElement('pre')
     applyStyles(pre, preStyle)
@@ -170,6 +198,8 @@
 
     const hints = document.createElement('div')
     hints.appendChild(document.createTextNode(`[i] ${internalDisabled ? 'Show' : 'Hide'} internal calls`))
+    hints.appendChild(document.createTextNode('\t\t'))
+    hints.appendChild(document.createTextNode(`[s] ${sourceDisabled ? 'Hide' : 'Show'} script source`))
     hints.appendChild(document.createTextNode('\t\t'))
     hints.appendChild(document.createTextNode('[escape] Close'))
     applyStyles(hints, hintsStyle)
@@ -201,11 +231,12 @@
       trace.appendChild(omittedFrames)
       omittedFramesCount = 0
     }
+    let main = true
     for (let frame of resolvedFrames) {
       const {
         functionName,
         fileName, lineNumber, columnNumber,
-        _scriptLines,
+        scriptLines,
         sourceFileName, sourceLineNumber, sourceColumnNumber,
         sourceLines
       } = frame
@@ -235,7 +266,7 @@
       } else {
         applyStyles(elemFunctionName, functionNameStyle)
       }
-      elemFunctionName.appendChild(document.createTextNode(functionName || '(anonymous function)'))
+      elemFunctionName.appendChild(document.createTextNode(functionName && functionName !== 'Object.<anonymous>' ? functionName : '(anonymous function)'))
       elem.appendChild(elemFunctionName)
 
       const elemLink = document.createElement('div')
@@ -247,8 +278,13 @@
       elemLink.appendChild(elemAnchor)
       elem.appendChild(elemLink)
 
-      if (!internalUrl && sourceLines.length !== 0) {
-        elem.appendChild(sourceCodePre(sourceLines, sourceLineNumber, sourceColumnNumber))
+      if (!internalUrl) {
+        if (sourceDisabled && scriptLines.length !== 0) {
+          elem.appendChild(sourceCodePre(scriptLines, lineNumber, columnNumber, main))
+        } else if (!sourceDisabled && sourceLines.length !== 0) {
+          elem.appendChild(sourceCodePre(sourceLines, sourceLineNumber, sourceColumnNumber, main))
+        }
+        main = false
       }
 
       trace.appendChild(elem)
@@ -314,6 +350,7 @@
     const { key, keyCode, which } = event
     if (key === 'Escape' || keyCode === 27 || which === 27) unmount()
     else if (key === 'i' || keyCode === 73 || which === 73) toggleInternal()
+    else if (key === 's' || keyCode === 83 || which === 83) toggleSource()
   }
 
   window.addEventListener('keydown', escapeHandler)
